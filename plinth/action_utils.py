@@ -351,6 +351,19 @@ def get_ip_addresses():
 
     return addresses
 
+def get_snapper_ls():
+    """Return a list of snapshots made by snapper."""
+    snapshots = []
+
+    output = subprocess.check_output(['snapper', '-q', '--iso', 'ls', '-t', 'single'])
+    for line in output.decode().splitlines():
+        parts = line.split('|')
+        if not parts[0].startswith('-') and not parts[0].startswith('#'):
+            snapshots.append({'number': parts[0], 'date': parts[1]})
+
+    return snapshots
+
+
 
 def get_hostname():
     """Return the current hostname."""

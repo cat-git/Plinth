@@ -23,6 +23,7 @@ from django.contrib import messages
 from django.template.response import TemplateResponse
 from django.utils.translation import ugettext as _
 import logging
+import subprocess
 
 from .forms import SnapperForm
 from plinth import actions
@@ -41,6 +42,7 @@ def on_install():
 def index(request):
     """Serve configuration page."""
     status = get_status()
+    backups = get_backups()
 
     form = None
 
@@ -57,15 +59,26 @@ def index(request):
     return TemplateResponse(request, 'snapper.html',
                             {'title': _('Backup Freedombox'),
                              'status': status,
+                             'backups': backups,
                              'form': form})
 
 
 def get_status():
     """Get the current settings from server."""
     return {'enabled': snapper.is_enabled(),
-            'is_running': snapper.is_running(),
-            'time_zone': get_current_time_zone()}
+            'is_running': snapper.is_running()}
 
+def get_backups():
+    """Get the list of backups from snapper."""
+    snapshots = []
+
+    output = subprocess.check_output(['snapper', '-q', '--iso', 'ls', '-t', 'single'])
+    for line in output.decode().splitlines():
+        parts = line.split('|')
+        if not parts[0].startswith('-') and not parts[0].startswith('#'):
+            snapshots.append({'number': parts[0], 'date': parts[1]})
+
+    return snapshots
 
 def get_current_time_zone():
     """Get current time zone."""

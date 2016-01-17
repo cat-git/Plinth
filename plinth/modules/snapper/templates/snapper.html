@@ -42,7 +42,7 @@
       {% trans "Snapper is not running" %}
     {% endif %}
   </p>
-  {% include "diagnostics_button.html" with module="datetime" %}
+  {% include "diagnostics_button.html" with module="snapper" %}
 
   <h3>{% trans "Configuration" %}</h3>
 
@@ -54,5 +54,15 @@
     <input type="submit" class="btn btn-primary"
            value="{% trans "Update setup" %}"/>
   </form>
+
+  <h3>{% trans "Backups" %}</h3>
+
+  <p>
+    Something about backups
+    {% for backup in backups %}
+      <p>{{ backup.number }}:{{ backup.date }} <input type="submit" class="btn btn-primary"
+           value="{% trans "Restore this backup" %}"/></p>
+    {% endfor %}
+  </p>
 
 {% endblock %}

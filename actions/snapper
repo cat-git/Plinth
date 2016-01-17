@@ -46,6 +46,10 @@ def subcommand_disable(_):
     """Stop service."""
     action_utils.service_disable('snapper')
 
+def subcommand_ls(_):
+    """List Snapshots."""
+    action_utils.get_snapshot_ls()
+
 
 def main():
     """Parse arguments and perform all duties."""
