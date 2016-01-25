@@ -27,7 +27,7 @@
 
   <p>
     {% blocktrans trimmed %}
-    Something about snapper
+    Snapper creates 'snapshots' or backups of the FreedomBox filesystem on an hourly basis. It enables the option to revert to an earlier configuration. Snapper is not essential.
     {% endblocktrans %}
   </p>
 
@@ -57,12 +57,38 @@
 
   <h3>{% trans "Backups" %}</h3>
 
-  <p>
-    Something about backups
+    {% if not backups %}
+    Backups will be available here once created.
+    {% endif %}
+    {% if backups %}
+<div class="row">
+  <div class="col-sm-6">
+    <table class="table table-bordered table-condensed table-striped">
+      <thead>
+      <td>{% trans "Backup number" %}</td>
+      <td>{% trans "Date" %}</td>
+      <td>{% trans "Restore" %}</td>
+      </thead>
+      <tbody>
     {% for backup in backups %}
-      <p>{{ backup.number }}:{{ backup.date }} <input type="submit" class="btn btn-primary"
-           value="{% trans "Restore this backup" %}"/></p>
+        <tr>
+      <td>
+      <div>{{ backup.number }}</div>
+      </td>
+      <td>
+      <div>{{ backup.date }}</div>
+      </td>
+      <td>
+      <div> <input type="submit" class="btn btn-primary"
+           value="{% trans "Restore this backup" %}"/></div>
+      </td>
+      </tr>
     {% endfor %}
+</tbody>
+</table>
+</div>
+</div>
+    {% endif %}
   </p>
 
 {% endblock %}
