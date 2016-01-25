@@ -16,7 +16,7 @@
 #
 
 """
-Plinth module for configuring date and time
+Plinth module for configuring Snapper
 """
 
 from django.contrib import messages
@@ -72,13 +72,17 @@ def get_backups():
     """Get the list of backups from snapper."""
     snapshots = []
 
-    output = subprocess.check_output(['snapper', '-q', '--iso', 'ls', '-t', 'single'])
-    for line in output.decode().splitlines():
-        parts = line.split('|')
-        if not parts[0].startswith('-') and not parts[0].startswith('#'):
-            snapshots.append({'number': parts[0], 'date': parts[1]})
+    try:
+        output = subprocess.check_output(['snapper', '-q', '--iso', 'ls', '-t', 'single'])
+        for line in output.decode().splitlines():
+            parts = line.split('|')
+            if not parts[0].startswith('-') and not parts[0].startswith('#'):
+                snapshots.append({'number': parts[0], 'date': parts[1]})
 
-    return snapshots
+        return snapshots
+    except subprocess.CalledProcessError:
+        return False
+   
 
 def get_current_time_zone():
     """Get current time zone."""
@@ -97,16 +101,16 @@ def _apply_changes(request, old_status, new_status):
         snapper.service.notify_enabled(None, new_status['enabled'])
         messages.success(request, _('Configuration updated'))
 
-    if old_status['time_zone'] != new_status['time_zone'] and \
-       new_status['time_zone'] != 'none':
+    if old_status['snapper'] != new_status['snapper'] and \
+       new_status['snapper'] != 'none':
         modified = True
         try:
-            actions.superuser_run('timezone-change', [new_status['time_zone']])
+            actions.superuser_run('snapper', [new_status['snapper']])
         except Exception as exception:
-            messages.error(request, _('Error setting time zone: {exception}')
+            messages.error(request, _('Error setting Snapper status: {exception}')
                            .format(exception=exception))
         else:
-            messages.success(request, _('Time zone set'))
+            messages.success(request, _('Snapper status set'))
 
     if not modified:
         messages.info(request, _('Setting unchanged'))
