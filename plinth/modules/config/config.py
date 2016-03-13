@@ -28,16 +28,19 @@ from django.template.response import TemplateResponse
 from django.utils import translation
 from django.utils.translation import ugettext as _, ugettext_lazy
 import logging
+import os
 import re
 import socket
 
+import plinth
 from plinth import actions
 from plinth import cfg
-from plinth.modules.firewall import firewall
+from plinth.modules import firewall
 from plinth.modules.names import SERVICES
 from plinth.signals import pre_hostname_change, post_hostname_change
 from plinth.signals import domainname_change
 from plinth.signals import domain_added, domain_removed
+from plinth.utils import format_lazy
 
 
 HOSTNAME_REGEX = r'^[a-zA-Z0-9]([-a-zA-Z0-9]{,61}[a-zA-Z0-9])?$'
@@ -76,6 +79,7 @@ class TrimmedCharField(forms.CharField):
 
         return super(TrimmedCharField, self).clean(value)
 
+
 def domain_label_validator(domainname):
     """Validate domain name labels."""
     for label in domainname.split('.'):
@@ -92,12 +96,12 @@ class ConfigurationForm(forms.Form):
     # https://tools.ietf.org/html/rfc2181#section-11
     hostname = TrimmedCharField(
         label=ugettext_lazy('Hostname'),
-        help_text=\
-        ugettext_lazy('Hostname is the local name by which other machines on '
-                      'the local network reach your machine.  It must start '
-                      'and end with an alphabet or a digit and have as '
-                      'interior characters only alphabets, digits and '
-                      'hyphens.  Total length must be 63 characters or less.'),
+        help_text=format_lazy(ugettext_lazy(
+            'Hostname is the local name by which other devices on the local '
+            'network can reach your {box_name}.  It must start and end with '
+            'an alphabet or a digit and have as interior characters only '
+            'alphabets, digits and hyphens.  Total length must be 63 '
+            'characters or less.'), box_name=ugettext_lazy(cfg.box_name)),
         validators=[
             validators.RegexValidator(
                 HOSTNAME_REGEX,
@@ -105,14 +109,14 @@ class ConfigurationForm(forms.Form):
 
     domainname = TrimmedCharField(
         label=ugettext_lazy('Domain Name'),
-        help_text=\
-        ugettext_lazy('Domain name is the global name by which other machines '
-                      'on the Internet can reach you.  It must consist of '
-                      'labels separated by dots.  Each label must start and '
-                      'end with an alphabet or a digit and have as interior '
-                      'characters only alphabets, digits and hyphens.  Length '
-                      'of each label must be 63 characters or less.  Total '
-                      'length of domain name must be 253 characters or less.'),
+        help_text=format_lazy(ugettext_lazy(
+            'Domain name is the global name by which other devices on the '
+            'Internet can reach your {box_name}.  It must consist of labels '
+            'separated by dots.  Each label must start and end with an '
+            'alphabet or a digit and have as interior characters only '
+            'alphabets, digits and hyphens.  Length of each label must be 63 '
+            'characters or less.  Total length of domain name must be 253 '
+            'characters or less.'), box_name=ugettext_lazy(cfg.box_name)),
         required=False,
         validators=[
             validators.RegexValidator(
@@ -122,11 +126,22 @@ class ConfigurationForm(forms.Form):
 
     language = forms.ChoiceField(
         label=ugettext_lazy('Language'),
-        help_text=\
-        ugettext_lazy('Language for this FreedomBox web administration '
-                      'interface'),
-        required=False,
-        choices=settings.LANGUAGES)
+        help_text=ugettext_lazy(
+            'Language for this web administration interface'),
+        required=False)
+
+    def __init__(self, *args, **kwargs):
+        """Set limited language choices."""
+        super().__init__(*args, **kwargs)
+        languages = []
+        for language_code, language_name in settings.LANGUAGES:
+            locale_code = translation.to_locale(language_code)
+            plinth_dir = os.path.dirname(plinth.__file__)
+            if language_code == 'en' or os.path.exists(
+                    os.path.join(plinth_dir, 'locale', locale_code)):
+                languages.append((language_code, language_name))
+
+        self.fields['language'].choices = languages
 
 
 def init():
@@ -211,7 +226,7 @@ def _apply_changes(request, old_status, new_status):
             request.session[translation.LANGUAGE_SESSION_KEY] = language
         except Exception as exception:
             messages.error(request, _('Error setting language: {exception}')
-                            .format(exception=exception))
+                           .format(exception=exception))
         else:
             messages.success(request, _('Language changed'))
 

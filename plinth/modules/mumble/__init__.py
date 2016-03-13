@@ -27,7 +27,20 @@ from plinth import cfg
 from plinth import service as service_module
 
 
-depends = ['plinth.modules.apps']
+version = 1
+
+depends = ['apps']
+
+title = _('Voice Chat (Mumble)')
+
+description = [
+    _('Mumble is an open source, low-latency, encrypted, high quality '
+      'voice chat software.'),
+
+    _('You can connect to your Mumble server on the regular Mumble port '
+      '64738. <a href="http://mumble.info">Clients</a> to connect to Mumble '
+      'from your desktop and Android devices are available.')
+]
 
 service = None
 
@@ -35,13 +48,23 @@ service = None
 def init():
     """Intialize the Mumble module."""
     menu = cfg.main_menu.get('apps:index')
-    menu.add_urlname(_('Voice Chat (Mumble)'), 'glyphicon-headphones',
-                     'mumble:index', 900)
+    menu.add_urlname(title, 'glyphicon-headphones', 'mumble:index', 900)
 
     global service
     service = service_module.Service(
-        'mumble-plinth', _('Mumble Voice Chat Server'),
-        is_external=True, enabled=is_enabled())
+        'mumble-plinth', title, is_external=True, enabled=is_enabled())
+
+
+def setup(helper, old_version=None):
+    """Install and configure the module."""
+    helper.install(['mumble-server'])
+    helper.call('post', service.notify_enabled, None, True)
+
+
+def get_status():
+    """Get the current settings from server."""
+    return {'enabled': is_enabled(),
+            'is_running': is_running()}
 
 
 def is_enabled():
@@ -52,6 +75,13 @@ def is_enabled():
 def is_running():
     """Return whether the service is running."""
     return action_utils.service_is_running('mumble-server')
+
+
+def enable(should_enable):
+    """Enable/disable the module."""
+    sub_command = 'enable' if should_enable else 'disable'
+    actions.superuser_run('mumble', [sub_command])
+    service.notify_enabled(None, should_enable)
 
 
 def diagnose():

@@ -21,6 +21,7 @@ import django.conf
 from django.contrib.messages import constants as message_constants
 import django.core.management
 import django.core.wsgi
+from django.utils import translation
 import importlib
 import logging
 import os
@@ -33,6 +34,7 @@ from cherrypy.process.plugins import Daemonizer
 from plinth import cfg
 from plinth import module_loader
 from plinth import service
+from plinth import setup
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +59,9 @@ def parse_arguments():
     parser.add_argument(
         '--no-daemon', action='store_true', default=cfg.no_daemon,
         help='do not start as a daemon')
+    parser.add_argument(
+        '--setup', action='store_true', default=False,
+        help='run setup tasks on all essential modules and exit')
     parser.add_argument(
         '--diagnose', action='store_true', default=False,
         help='run diagnostic tests and exit')
@@ -132,9 +137,7 @@ def setup_server():
     cherrypy.tree.mount(None, manual_url, config)
     logger.debug('Serving manual images %s on %s', manual_dir, manual_url)
 
-    for module_import_path in module_loader.loaded_modules:
-        module = importlib.import_module(module_import_path)
-        module_name = module_import_path.split('.')[-1]
+    for module_name, module in module_loader.loaded_modules.items():
         module_path = os.path.dirname(module.__file__)
         static_dir = os.path.join(module_path, 'static')
         if not os.path.isdir(static_dir):
@@ -222,17 +225,6 @@ def configure_django():
     if cfg.secure_proxy_ssl_header:
         secure_proxy_ssl_header = (cfg.secure_proxy_ssl_header, 'https')
 
-    # Read translated languages from the 'locale' directory
-    languages = [('en', 'English')]
-    locale_dir = os.path.join(os.path.dirname(__file__), 'locale')
-    if os.path.isdir(locale_dir):
-        translated_language_codes = next(os.walk(locale_dir))[1]
-        all_languages = dict(django.conf.global_settings.LANGUAGES)
-        for code in translated_language_codes:
-            if code in all_languages:
-                languages.append((code, all_languages[code]))
-        languages = sorted(languages, key=lambda tup: tup[1])
-
     django.conf.settings.configure(
         ALLOWED_HOSTS=['*'],
         CACHES={'default':
@@ -242,7 +234,6 @@ def configure_django():
                     'NAME': cfg.store_file}},
         DEBUG=cfg.debug,
         INSTALLED_APPS=applications,
-        LANGUAGES=languages,
         LOGGING=logging_configuration,
         LOGIN_URL='users:login',
         LOGIN_REDIRECT_URL='apps:index',
@@ -258,6 +249,7 @@ def configure_django():
             'django.middleware.clickjacking.XFrameOptionsMiddleware',
             'stronghold.middleware.LoginRequiredMiddleware',
             'plinth.modules.first_boot.middleware.FirstBootMiddleware',
+            'plinth.middleware.SetupMiddleware',
         ),
         ROOT_URLCONF='plinth.urls',
         SECURE_PROXY_SSL_HEADER=secure_proxy_ssl_header,
@@ -276,6 +268,18 @@ def configure_django():
     django.core.management.call_command('migrate', '--fake-initial',
                                         interactive=False)
     os.chmod(cfg.store_file, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP)
+
+
+def run_setup_and_exit():
+    """Run setup on all essential modules and exit."""
+    error_code = 0
+    try:
+        setup.setup_all_modules(essential=True)
+    except Exception as exception:
+        logger.error('Error running setup - %s', exception)
+        error_code = 1
+
+    sys.exit(error_code)
 
 
 def run_diagnostics_and_exit():
@@ -314,6 +318,9 @@ def main():
     logger.info('Script prefix - %s', cfg.server_dir)
 
     module_loader.load_modules()
+
+    if arguments.setup:
+        run_setup_and_exit()
 
     if arguments.diagnose:
         run_diagnostics_and_exit()

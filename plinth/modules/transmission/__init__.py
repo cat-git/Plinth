@@ -20,6 +20,8 @@ Plinth module to configure Transmission server
 """
 
 from django.utils.translation import ugettext_lazy as _
+import json
+import socket
 
 from plinth import actions
 from plinth import action_utils
@@ -27,21 +29,58 @@ from plinth import cfg
 from plinth import service as service_module
 
 
-depends = ['plinth.modules.apps']
+version = 1
+
+depends = ['apps']
+
+title = _('BitTorrent (Transmission)')
+
+description = [
+    _('BitTorrent is a peer-to-peer file sharing protocol. '
+      'Transmission daemon handles Bitorrent file sharing.  Note that '
+      'BitTorrent is not anonymous.')
+]
 
 service = None
+
+TRANSMISSION_CONFIG = '/etc/transmission-daemon/settings.json'
 
 
 def init():
     """Intialize the Transmission module."""
     menu = cfg.main_menu.get('apps:index')
-    menu.add_urlname(_('BitTorrent (Transmission)'), 'glyphicon-save',
-                     'transmission:index', 300)
+    menu.add_urlname(title, 'glyphicon-save', 'transmission:index', 300)
 
     global service
     service = service_module.Service(
-        'transmission', _('Transmission BitTorrent'), ['http', 'https'],
-        is_external=True, enabled=is_enabled())
+        'transmission', title, ['http', 'https'], is_external=True,
+        enabled=is_enabled())
+
+
+def setup(helper, old_version=None):
+    """Install and configure the module."""
+    helper.install(['transmission-daemon'])
+
+    new_configuration = {'rpc-whitelist-enabled': False}
+    helper.call('post', actions.superuser_run, 'transmission',
+                ['merge-configuration'],
+                input=json.dumps(new_configuration).encode())
+
+    helper.call('post', actions.superuser_run, 'transmission', ['enable'])
+    helper.call('post', service.notify_enabled, None, True)
+
+
+def get_status():
+    """Get the current settings from Transmission server."""
+    configuration = open(TRANSMISSION_CONFIG, 'r').read()
+    status = json.loads(configuration)
+    status = {key.translate(str.maketrans({'-': '_'})): value
+              for key, value in status.items()}
+    status['enabled'] = is_enabled()
+    status['is_running'] = is_running()
+    status['hostname'] = socket.gethostname()
+
+    return status
 
 
 def is_enabled():
@@ -53,6 +92,13 @@ def is_enabled():
 def is_running():
     """Return whether the service is running."""
     return action_utils.service_is_running('transmission-daemon')
+
+
+def enable(should_enable):
+    """Enable/disable the module."""
+    sub_command = 'enable' if should_enable else 'disable'
+    actions.superuser_run('transmission', [sub_command])
+    service.notify_enabled(None, should_enable)
 
 
 def diagnose():

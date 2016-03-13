@@ -21,14 +21,49 @@ Plinth module for upgrades
 
 from django.utils.translation import ugettext_lazy as _
 
+from plinth import actions
 from plinth import cfg
 
 
-depends = ['plinth.modules.system']
+version = 1
+
+is_essential = True
+
+depends = ['system']
+
+title = _('Software Upgrades')
+
+description = [
+    _('Upgrades install the latest software and security updates. When '
+      'automatic upgrades are enabled, upgrades are automatically run every '
+      'night. You don\'t normally need to start the upgrade process.')
+]
 
 
 def init():
     """Initialize the module."""
     menu = cfg.main_menu.get('system:index')
-    menu.add_urlname(_('Software Upgrades'), 'glyphicon-refresh',
-                     'upgrades:index', 21)
+    menu.add_urlname(title, 'glyphicon-refresh', 'upgrades:index', 21)
+
+
+def setup(helper, old_version=None):
+    """Install and configure the module."""
+    helper.install(['unattended-upgrades'])
+    helper.call('post', actions.superuser_run, 'upgrades', ['enable-auto'])
+
+
+def get_status():
+    """Return the current status."""
+    return {'auto_upgrades_enabled': 'is_enabled'}
+
+
+def is_enabled():
+    """Return whether the module is enabled."""
+    output = actions.run('upgrades', ['check-auto'])
+    return 'True' in output.split()
+
+
+def enable(should_enable):
+    """Enable/disable the module."""
+    option = 'enable-auto' if should_enable else 'disable-auto'
+    actions.superuser_run('upgrades', [option])

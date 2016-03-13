@@ -24,6 +24,7 @@ from django.utils.translation import ugettext as _
 
 from . import SERVICES, get_domain_types, get_description
 from . import get_domain, get_services_status
+from plinth.modules import names
 
 
 def index(request):
@@ -31,7 +32,7 @@ def index(request):
     status = get_status()
 
     return TemplateResponse(request, 'names.html',
-                            {'title': _('Name Services'),
+                            {'title': names.title,
                              'status': status})
 
 
@@ -42,7 +43,7 @@ def get_status():
         domain = get_domain(domain_type)
         name_services.append({
             'type': get_description(domain_type),
-            'name': domain,
+            'name': domain or _('Not Available'),
             'services_enabled': get_services_status(domain_type, domain),
         })
 

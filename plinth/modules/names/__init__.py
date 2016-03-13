@@ -19,20 +19,25 @@
 Plinth module to configure name services
 """
 
-from django.utils.translation import ugettext as _, ugettext_lazy
+from django.utils.translation import ugettext_lazy as _
 import logging
 
 from plinth import cfg
 from plinth.signals import domain_added, domain_removed
 
+SERVICES = (
+    ('http', _('HTTP'), 80),
+    ('https', _('HTTPS'), 443),
+    ('ssh', _('SSH'), 22),
+)
 
-SERVICES = [
-    ('http', ugettext_lazy('HTTP'), 80),
-    ('https', ugettext_lazy('HTTPS'), 443),
-    ('ssh', ugettext_lazy('SSH'), 22),
-]
+version = 1
 
-depends = ['plinth.modules.system']
+is_essential = True
+
+depends = ['system']
+
+title = _('Name Services')
 
 domain_types = {}
 domains = {}
@@ -43,8 +48,7 @@ logger = logging.getLogger(__name__)
 def init():
     """Initialize the names module."""
     menu = cfg.main_menu.get('system:index')
-    menu.add_urlname(ugettext_lazy('Name Services'), 'glyphicon-tag',
-                     'names:index', 19)
+    menu.add_urlname(title, 'glyphicon-tag', 'names:index', 19)
 
     domain_added.connect(on_domain_added)
     domain_removed.connect(on_domain_removed)
@@ -55,6 +59,7 @@ def on_domain_added(sender, domain_type, name='', description='',
     """Add domain to global list."""
     if not domain_type:
         return
+
     domain_types[domain_type] = description
 
     if not name:
@@ -104,10 +109,10 @@ def get_domain(domain_type):
     if domain_type in domains and len(domains[domain_type]) > 0:
         return list(domains[domain_type].keys())[0]
     else:
-        return _('Not Available')
+        return None
 
 
-def get_services(domain_type, domain):
+def get_enabled_services(domain_type, domain):
     """Get list of enabled services for a domain."""
     try:
         return domains[domain_type][domain]
@@ -118,5 +123,5 @@ def get_services(domain_type, domain):
 
 def get_services_status(domain_type, domain):
     """Get list of whether each service is enabled for a domain."""
-    enabled = get_services(domain_type, domain)
+    enabled = get_enabled_services(domain_type, domain)
     return [service[0] in enabled for service in SERVICES]

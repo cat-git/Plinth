@@ -88,10 +88,20 @@ class CreateUserForm(UserCreationForm):
 
 class UserUpdateForm(forms.ModelForm):
     """When user info is changed, also updates LDAP user."""
+    ssh_keys = forms.CharField(
+        label=ugettext_lazy('SSH Keys'),
+        required=False,
+        widget=forms.Textarea,
+        help_text=\
+        ugettext_lazy('Setting an SSH public key will allow this user to '
+                      'securely log in to the system without using a '
+                      'password. You may enter multiple keys, one on each '
+                      'line. Blank lines and lines starting with # will be '
+                      'ignored.'))
 
     class Meta:
         """Metadata to control automatic form building."""
-        fields = ('username', 'groups', 'is_active')
+        fields = ('username', 'groups', 'ssh_keys', 'is_active')
         model = User
         widgets = {
             'groups': forms.widgets.CheckboxSelectMultiple(),
@@ -147,6 +157,10 @@ class UserUpdateForm(forms.ModelForm):
                     except ActionError:
                         messages.error(self.request,
                                        _('Failed to add user to group.'))
+
+            actions.superuser_run(
+                'ssh', ['set-keys', '--username', user.get_username(),
+                        '--keys', self.cleaned_data['ssh_keys'].strip()])
 
         return user
 
