@@ -27,90 +27,37 @@ import subprocess
 
 from .forms import SnapperForm
 from plinth import actions
+from plinth import views
 from plinth import package
 from plinth.modules import snapper
 
 logger = logging.getLogger(__name__)
 
+class ConfigurationView(views.ConfigurationView):
+	"""Serve configuration page."""
+	form_class = SnapperForm
 
-def on_install():
-    """Notify that the service is now enabled."""
-    snapper.service.notify_enabled(None, True)
+	def _apply_changes(request, old_status, new_status):
+	    """Apply the changes."""
+	    modified = False
 
+	    if old_status['enabled'] != new_status['enabled']:
+	        sub_command = 'enable' if new_status['enabled'] else 'disable'
+	        modified = True
+	        actions.superuser_run('snapper', [sub_command])
+	        snapper.service.notify_enabled(None, new_status['enabled'])
+	        messages.success(request, _('Configuration updated'))
 
-@package.required(['snapper'], on_install=on_install)
-def index(request):
-    """Serve configuration page."""
-    status = get_status()
-    backups = get_backups()
+	    if old_status['snapper'] != new_status['snapper'] and \
+	       new_status['snapper'] != 'none':
+	        modified = True
+	        try:
+	            actions.superuser_run('snapper', [new_status['snapper']])
+	        except Exception as exception:
+	            messages.error(request, _('Error setting Snapper status: {exception}')
+	                           .format(exception=exception))
+	        else:
+	            messages.success(request, _('Snapper status set'))
 
-    form = None
-
-    if request.method == 'POST':
-        form = SnapperForm(request.POST, prefix='snapper')
-        # pylint: disable=E1101
-        if form.is_valid():
-            _apply_changes(request, status, form.cleaned_data)
-            status = get_status()
-            form = SnapperForm(initial=status, prefix='snapper')
-    else:
-        form = SnapperForm(initial=status, prefix='snapper')
-
-    return TemplateResponse(request, 'snapper.html',
-                            {'title': _('Backup Freedombox'),
-                             'status': status,
-                             'backups': backups,
-                             'form': form})
-
-
-def get_status():
-    """Get the current settings from server."""
-    return {'enabled': snapper.is_enabled(),
-            'is_running': snapper.is_running()}
-
-def get_backups():
-    """Get the list of backups from snapper."""
-    snapshots = []
-
-    try:
-        output = subprocess.check_output(['snapper', '-q', '--iso', 'ls', '-t', 'single'])
-        for line in output.decode().splitlines():
-            parts = line.split('|')
-            if not parts[0].startswith('-') and not parts[0].startswith('#'):
-                snapshots.append({'number': parts[0], 'date': parts[1]})
-
-        return snapshots
-    except subprocess.CalledProcessError:
-        return False
-   
-
-def get_current_time_zone():
-    """Get current time zone."""
-    time_zone = open('/etc/timezone').read().rstrip()
-    return time_zone or 'none'
-
-
-def _apply_changes(request, old_status, new_status):
-    """Apply the changes."""
-    modified = False
-
-    if old_status['enabled'] != new_status['enabled']:
-        sub_command = 'enable' if new_status['enabled'] else 'disable'
-        modified = True
-        actions.superuser_run('snapper', [sub_command])
-        snapper.service.notify_enabled(None, new_status['enabled'])
-        messages.success(request, _('Configuration updated'))
-
-    if old_status['snapper'] != new_status['snapper'] and \
-       new_status['snapper'] != 'none':
-        modified = True
-        try:
-            actions.superuser_run('snapper', [new_status['snapper']])
-        except Exception as exception:
-            messages.error(request, _('Error setting Snapper status: {exception}')
-                           .format(exception=exception))
-        else:
-            messages.success(request, _('Snapper status set'))
-
-    if not modified:
-        messages.info(request, _('Setting unchanged'))
+	    if not modified:
+	        messages.info(request, _('Setting unchanged'))

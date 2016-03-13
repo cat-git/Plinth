@@ -21,8 +21,9 @@ URLs for the snapper module
 
 from django.conf.urls import url
 
-from . import views
+from .views import ConfigurationView
 
 urlpatterns = [
-    url(r'^sys/snapper/$', views.index, name='index'),
+    url(r'^sys/snapper/$', ConfigurationView.as_view(module_name='snapper'),
+        name='index'),
 ]

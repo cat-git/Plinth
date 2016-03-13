@@ -68,6 +68,7 @@
       <td>{% trans "Backup number" %}</td>
       <td>{% trans "Date" %}</td>
       <td>{% trans "Restore" %}</td>
+      <td>{% trans "Delete" %}</td>
       </thead>
       <tbody>
     {% for backup in backups %}
@@ -81,6 +82,17 @@
       <td>
       <div> <input type="submit" class="btn btn-primary"
            value="{% trans "Restore this backup" %}"/></div>
+      </td>
+      <td>
+      <div>
+<a href="#"
+               class="btn btn-default btn-sm pull-right"
+               role="button"
+               title="{% blocktrans with name=backup.number %}Delete backup {{ name }}{% endblocktrans %}">
+              <span class="glyphicon glyphicon-trash"
+                    aria-hidden="true"></span>
+            </a>
+
       </td>
       </tr>
     {% endfor %}

@@ -28,5 +28,15 @@ import re
 class SnapperForm(forms.Form):
     """Snapper configuration form."""
     enabled = forms.BooleanField(
-        label=_('Enable Snapper Backups'),
+        label=_('Enable System Snapshots'),
         required=False)
+
+    volume = forms.ChoiceField(
+        label=_('Volumes'),
+        help_text=_('Choose a volume to backup.'))
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the snapper form."""
+        forms.Form.__init__(self, *args, **kwargs)
+
+        self.fields['volume'].choices = [('/', 'root'), ('/home', 'home')]

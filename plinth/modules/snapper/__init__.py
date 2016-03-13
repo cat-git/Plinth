@@ -20,15 +20,20 @@ Plinth module to configure snapper backups
 """
 
 from django.utils.translation import ugettext_lazy as _
-import subprocess
 
-from plinth import actions
 from plinth import action_utils
 from plinth import cfg
 from plinth import service as service_module
 
+version = 1
 
-depends = ['plinth.modules.system']
+depends = ['system']
+
+title = _('System Snapshots')
+
+description = [
+    _('Things about snapper and that')
+]
 
 service = None
 
@@ -36,13 +41,26 @@ service = None
 def init():
     """Intialize the Snapper module."""
     menu = cfg.main_menu.get('system:index')
-    menu.add_urlname(_('Backup Freedombox'), 'glyphicon-save',
-                     'snapper:index', 1000)
+    menu.add_urlname(_('System Snapshots'), 'glyphicon-save',
+                     'snapper:index', 980)
 
     global service
     service = service_module.Service(
-        'snapper', _('Freedombox Backups'),
-        is_external=False, enabled=is_enabled())
+        'snapper', title, is_external=False, enabled=is_enabled())
+
+
+def setup(helper, old_version=None):
+    """Install and configure the module."""
+    helper.install(['snapper'])
+    helper.call('post', serice.notify_enabled, None, True)
+
+
+def get_status():
+    """Get the current settings from server."""
+    return {
+        'enabled': is_enabled(),
+        'is_running': is_running()
+    }
 
 
 def is_enabled():
@@ -54,23 +72,12 @@ def is_running():
     """Return whether the service is running."""
     return action_utils.service_is_running('snapper')
 
+def diagnose():
+    """Run diagnostics and return the results."""
+    results = []
+    results.append(_diagnose_volumes())
 
-#def diagnose():
-#    """Run diagnostics and return the results."""
-#    results = []
-#    results.append(_diagnose_ntp_server_count())
-#
-#    return results
-#
-#
-#def _diagnose_ntp_server_count():
-#    """Diagnose minimum NTP server count."""
-#    result = 'failed'
-#    try:
-#        output = subprocess.check_output(['ntpq', '-n', '-c', 'lpeers'])
-#        if len(output.decode().splitlines()[2:]):
-#            result = 'passed'
-#    except subprocess.CalledProcessError:
-#        pass
-#
-#    return [_('NTP client in contact with servers'), result]
+    return results
+
+def _diagnose_volumes():
+    return['not implemented']
